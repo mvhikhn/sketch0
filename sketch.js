@@ -1,156 +1,148 @@
+const COLORS = {
+  background: "#1d1d1b",
+  border: "#f2f2e7",
+  palette: ["#4793AF", "#FFC470", "#DD5746", "#8B322C"]
+};
 
-let backgroundColor = "#1d1d1b";
-let borderColor = "#f2f2e7";
-let colorPalette = [
-  "#c38f6d",
-  "#ea7f4a",
-  "#bf9d63",
-  "#7a5c3d",
-  "#f2e0a9",
-  "#af7a5d"
-];
+const SETTINGS = {
+  animationSpeed: 0.03,
+  maxDepth: 2,
+  minModuleSize: 40,
+  subdivideChance: 0.4,
+  crossSize: 0.7
+};
 
-let sineScale = 0.01;
-
-let columns;
-let rows;
+let grid = {
+  columns: 0,
+  rows: 0,
+  moduleSize: 0,
+  seed: 0,
+  depth: 0
+};
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
   strokeJoin(ROUND);
-  
-  columns = floor(random(3, 7));
-  let moduleSize = width / columns;
-  rows = ceil(height / moduleSize);
-  
-  seed = random(1000);
+
+  // Random grid setup
+  grid.columns = floor(random(5, 8));
+  grid.moduleSize = width / grid.columns;
+  grid.rows = ceil(height / grid.moduleSize);
+  grid.seed = random(1000);
+
+  stroke(COLORS.border);
+  strokeWeight(2);
+  frameRate(60);
 }
 
 function draw() {
-  background(220);
-  randomSeed(seed);
-  drawGrid(0, 0, columns, rows, width);
+  background(COLORS.background);
+  randomSeed(grid.seed);
+
+  const movement = (sin(frameCount * SETTINGS.animationSpeed) + 1) / 2;
+  grid.depth = 0;
+
+  drawGrid(0, 0, grid.columns, grid.rows, width, movement);
 }
 
-function drawGrid(xStart, yStart, colCount, rowCount, totalWidth) {
-  
-  stroke(borderColor);
-  strokeWeight(2);
-  
-  let moduleSize = totalWidth / colCount;
-  let differentialMovement = 0;
-  for (let j = 0; j < rowCount; j++) {
-    for (let i = 0; i < colCount; i++) {
-      
-      let x = xStart + i * moduleSize;
-      let y = yStart + j * moduleSize;
-      
-      let colorIndex = floor(random(colorPalette.length - 1));
-      fill(colorPalette[colorIndex]);
-      rect(x, y, moduleSize, moduleSize);
-      fill(colorPalette[(colorIndex + 1) % colorPalette.length]);
-      
-      let movement = map(sin(frameCount * sineScale + differentialMovement), -1, 1, 0, 1);
-      
-      let selector = floor(random(6 + 3));
-      
-      if (selector === 0) {
-        let outerRadius = moduleSize / 2 - 5;
-        let innerRadius = outerRadius * movement;
-        let pointsCount = [4, 6, 8, 10, 12, 14, 16, 18][floor(random() * 8)];
-        drawStar(x + moduleSize / 2, y + moduleSize / 2, innerRadius, outerRadius, pointsCount, 0);
-      }
-      
-      if (selector === 1) {
-        let diameter = random(moduleSize / 2, moduleSize) * movement;
-        circle(x + moduleSize / 2, y + moduleSize / 2, diameter);
-      }
-      
-      if (selector === 2) {
-        let points = [3, 5, 7, 9, 11, 13][floor(random(6))];
-        let pointsHeight = map(movement, 0, 1, 0.2, 0.8);
-        drawDoubleCrown(x, y, moduleSize, moduleSize, points, pointsHeight);
-      }
-      
-      if (selector === 3) {
-        let shaftWidth = map(movement, 0, 1, 0.2, 0.8);
-        drawAxe(x, y, moduleSize, moduleSize, shaftWidth);
-      }
-      
-      if (selector === 4) {
-        let openingWidth = random(0.4, 1) * movement;
-        drawRhombus(x, y, moduleSize, moduleSize, openingWidth);
-      }
-      if (selector >= 5 && moduleSize > 60) {
-        drawGrid(x, y, 2, 2, moduleSize);
-      }
-      differentialMovement += 1;
+function drawGrid(x, y, cols, rows, size, movement) {
+  const cellSize = size / cols;
+
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      const posX = x + col * cellSize;
+      const posY = y + row * cellSize;
+
+      drawCell(posX, posY, cellSize, movement);
     }
   }
 }
 
-function drawStar(x, y, innerRadius, outerRadius, pointsCount, startAngle) {
-  let step = TWO_PI / pointsCount;
+function drawCell(x, y, size, movement) {
+  const colorIndex = floor(random(COLORS.palette.length));
+
+  fill(COLORS.palette[colorIndex]);
+  rect(x, y, size, size);
+
+  if (shouldSubdivide(size)) {
+    grid.depth++;
+    drawGrid(x, y, 2, 2, size, movement);
+    grid.depth--;
+    return;
+  }
+
+  fill(COLORS.palette[(colorIndex + 1) % COLORS.palette.length]);
+  const shapeType = floor(random(4));
+  drawShape(shapeType, x, y, size, movement);
+}
+
+function shouldSubdivide(size) {
+  return random() < SETTINGS.subdivideChance && 
+         grid.depth < SETTINGS.maxDepth && 
+         size > SETTINGS.minModuleSize;
+}
+
+function drawShape(type, x, y, size, movement) {
+  const center = { x: x + size / 2, y: y + size / 2 };
+
+  switch(type) {
+    case 0:
+      drawSpinningCross(center, size, movement);
+      break;
+    case 1:
+      const maxRadius = size / 2 * 0.9;
+      circle(center.x, center.y, maxRadius * 2 * movement);
+      break;
+    case 2:
+      drawCrown(x, y, size, movement);
+      break;
+    case 3:
+      drawDiamond(x, y, size, movement);
+      break;
+  }
+}
+
+function drawSpinningCross(center, size, phase) {
+  const rotation = phase * TWO_PI;
+  const armLength = size * SETTINGS.crossSize / 2;
+  const padding = size * 0.1;
+
+  push();
+  translate(center.x, center.y);
+  rotate(rotation);
+
+  const safeLength = min(armLength, (size/2 - padding));
+  rectMode(CENTER);
+  rect(0, 0, safeLength * 2, safeLength * 0.2);
+  rect(0, 0, safeLength * 0.2, safeLength * 2);
+
+  pop();
+}
+
+function drawCrown(x, y, size, height) {
+  const points = 5;
+  const spacing = size / (points - 1);
+  const peakHeight = size * height * 0.4;
+
   beginShape();
-  for (let i = 0; i < pointsCount; i++) {
-    let angle = startAngle + step * i;
-    let innerX = x + cos(angle) * innerRadius;
-    let innerY = y + sin(angle) * innerRadius;
-    vertex(innerX, innerY);
-    let outerX = x + cos(angle + step / 2.0) * outerRadius;
-    let outerY = y + sin(angle + step / 2.0) * outerRadius;
-    vertex(outerX, outerY);
+  for (let i = 0; i < points; i++) {
+    vertex(x + i * spacing, y + (i % 2 ? peakHeight : 0));
+  }
+  for (let i = points - 1; i >= 0; i--) {
+    vertex(x + i * spacing, y + size - (i % 2 ? peakHeight : 0));
   }
   endShape(CLOSE);
 }
 
-function drawDoubleCrown(x, y, width, height, pointsCount, relativeHeight) {
-  let pointsHeight = height * relativeHeight / 2;
-  let pointSpacing = width / (pointsCount - 1);
-  beginShape();
-  for (let i = 0; i < pointsCount; i++) {
-    let pointX = x + i * pointSpacing;
-    let pointY = y;
-    if (i % 2 !== 0) {
-      pointY = y + pointsHeight;
-    }
-    vertex(pointX, pointY);
-  }
-  for (let i = 0; i < pointsCount; i++) {
-    let pointX = (x + width) - (i * pointSpacing);
-    let pointY = y + height;
-    if (i % 2 !== 0) {
-      pointY = (y + height) - pointsHeight;
-    }
-    vertex(pointX, pointY);
-  }
-  endShape(CLOSE);
-}
+function drawDiamond(x, y, size, scale) {
+  const center = size / 2;
+  const maxOffset = center * 0.9;
+  const offset = maxOffset * scale;
 
-function drawAxe(x, y, width, height, shaftWidthRelative) {
-  let shaftWidth = width * shaftWidthRelative / 2;
   beginShape();
-  vertex(x, y);
-  vertex(x + shaftWidth, y + shaftWidth);
-  vertex(x + shaftWidth, y);
-  vertex(x + (width - shaftWidth), y);
-  vertex(x + (width - shaftWidth), y + shaftWidth);
-  vertex(x + width, y);
-  vertex(x + width, y + height);
-  vertex(x + (width - shaftWidth), y + (height - shaftWidth));
-  vertex(x + (width - shaftWidth), y + height);
-  vertex(x + shaftWidth, y + height);
-  vertex(x + shaftWidth, y + (height - shaftWidth));
-  vertex(x, y + height);
-  endShape(CLOSE);
-}
-
-function drawRhombus(x, y, width, height, openingRelative) {
-  let openingWidth = width * openingRelative / 2;
-  beginShape();
-  vertex(x + openingWidth, y + height / 2);
-  vertex(x + width / 2, y);
-  vertex(x + (width - openingWidth), y + height / 2);
-  vertex(x + width / 2, y + height);
+  vertex(x + center, y + offset);
+  vertex(x + size - offset, y + center);
+  vertex(x + center, y + size - offset);
+  vertex(x + offset, y + center);
   endShape(CLOSE);
 }
