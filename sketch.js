@@ -24,7 +24,7 @@ function setup() {
   createCanvas(windowWidth, windowHeight);
   strokeJoin(ROUND);
 
-  // Random grid setup
+ 
   grid.columns = floor(random(5, 8));
   grid.moduleSize = width / grid.columns;
   grid.rows = ceil(height / grid.moduleSize);
